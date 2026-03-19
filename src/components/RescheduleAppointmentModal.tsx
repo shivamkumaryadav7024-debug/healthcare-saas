@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { FiX, FiCalendar } from 'react-icons/fi';
 import Button from './Button';
+import { sendSuccessPushNotification, sendErrorPushNotification } from '../utils/toast';
 
 interface RescheduleAppointmentModalProps {
   patientName: string;
@@ -22,8 +23,30 @@ const RescheduleAppointmentModal: React.FC<RescheduleAppointmentModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (newDate && newDate !== currentDate) {
-      onSave(newDate);
-      onClose();
+      try {
+        onSave(newDate);
+        
+        // Show browser push notification
+        sendSuccessPushNotification(
+          `✓ Appointment Rescheduled for ${patientName}`,
+          {
+            body: `New date: ${newDate}\nPrevious: ${currentDate}`,
+            requireInteraction: false,
+            tag: 'appointment-reschedule',
+          }
+        );
+        
+        onClose();
+      } catch (error) {
+        console.error('Error rescheduling appointment:', error);
+        sendErrorPushNotification(
+          '✗ Error Rescheduling',
+          {
+            body: 'Failed to reschedule appointment. Please try again.',
+            requireInteraction: true,
+          }
+        );
+      }
     }
   };
 

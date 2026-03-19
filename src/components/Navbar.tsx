@@ -12,7 +12,7 @@ import {
   FiUsers,
   FiBarChart2,
 } from 'react-icons/fi';
-import { showSuccessNotification, showInfoNotification } from '../utils/toast';
+import { showSuccessNotification, requestNotificationPermission, sendInfoPushNotification, isPushNotificationsEnabled } from '../utils/toast';
 
 const Navbar: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -30,8 +30,30 @@ const Navbar: React.FC = () => {
     }
   };
 
-  const handleNotificationClick = () => {
-    showInfoNotification('No new notifications at this time. Check back later!');
+  const handleNotificationClick = async () => {
+    // Check if notifications are enabled
+    const isEnabled = isPushNotificationsEnabled();
+    
+    if (!isEnabled) {
+      // Request permission if not enabled
+      const permission = await requestNotificationPermission();
+      if (permission) {
+        sendInfoPushNotification('✓ Notifications Enabled', {
+          body: 'You will now receive desktop notifications',
+          requireInteraction: false,
+        });
+        showSuccessNotification('Push notifications enabled!');
+      } else {
+        showSuccessNotification('Permission denied. Please enable notifications in browser settings.');
+      }
+    } else {
+      // Show notification status
+      sendInfoPushNotification('📬 Notification Center', {
+        body: 'No new notifications. Patient updates and alerts will appear here.',
+        requireInteraction: false,
+        tag: 'notification-center',
+      });
+    }
   };
 
   return (
@@ -76,10 +98,13 @@ const Navbar: React.FC = () => {
               {/* Notifications */}
               <button 
                 onClick={handleNotificationClick}
-                className="p-2 text-gray-700 hover:text-indigo-600 transition hover:bg-indigo-50 rounded-lg"
-                title="View Notifications"
+                className="p-2 text-gray-700 hover:text-indigo-600 transition hover:bg-indigo-50 rounded-lg relative"
+                title="Enable/View Notifications"
               >
                 <FiBell size={20} />
+                {!isPushNotificationsEnabled() && (
+                  <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                )}
               </button>
 
               {/* User Menu */}

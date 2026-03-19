@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FiX, FiSave, FiAlertCircle } from 'react-icons/fi';
 import Button from './Button';
+import { sendSuccessPushNotification, sendErrorPushNotification } from '../utils/toast';
 
 export interface Patient {
   id: string;
@@ -141,11 +142,29 @@ const EditPatientModal: React.FC<EditPatientModalProps> = ({
     if (Object.keys(newErrors).length === 0) {
       try {
         onSave(formData);
+        
+        // Show browser push notification
+        sendSuccessPushNotification(
+          `✓ Patient Updated: ${formData.name}`,
+          {
+            body: `Email: ${formData.email}\nPhone: ${formData.phone}`,
+            requireInteraction: false,
+            tag: 'patient-update',
+          }
+        );
+        
         setErrors({});
         setTouched({});
         onClose();
       } catch (error) {
         console.error('Error saving patient:', error);
+        sendErrorPushNotification(
+          '✗ Error Saving Patient',
+          {
+            body: 'Failed to update patient information. Please try again.',
+            requireInteraction: true,
+          }
+        );
       }
     } else {
       setErrors(newErrors);

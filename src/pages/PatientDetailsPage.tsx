@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAppSelector } from '../hooks/useAppSelector';
 import { useAppDispatch } from '../hooks/useAppDispatch';
 import { initializeMockData, updatePatient } from '../store/patientSlice';
-import { sendSuccessPushNotification, sendErrorPushNotification, sendPushNotification } from '../utils/toast';
+import { sendPushNotification } from '../utils/toast';
 import { FiArrowLeft, FiPhone, FiMail, FiMessageCircle, FiEdit2, FiCalendar, FiGift, FiUser as FiGender, FiFileText } from 'react-icons/fi';
 import Button from '../components/Button';
 import Card from '../components/Card';
@@ -42,13 +42,7 @@ const PatientDetailsPage: React.FC = () => {
   const handleRescheduleAppointment = (newDate: string) => {
     const updatedPatient = { ...patient, appointmentDate: newDate };
     dispatch(updatePatient(updatedPatient));
-    sendSuccessPushNotification(
-      `✓ Appointment Rescheduled for ${patient.name}`,
-      {
-        body: `New appointment date: ${newDate}`,
-        requireInteraction: false,
-      }
-    );
+    // Notification is handled in the RescheduleAppointmentModal
   };
 
   const handleSendMessage = () => {
@@ -57,6 +51,7 @@ const PatientDetailsPage: React.FC = () => {
       {
         body: 'Your message has been queued for delivery',
         requireInteraction: false,
+        tag: 'message-sent',
       }
     );
   };
@@ -64,13 +59,7 @@ const PatientDetailsPage: React.FC = () => {
   const handleEditPatient = (updatedPatient: any) => {
     // Dispatch action to update patient in Redux store
     dispatch(updatePatient(updatedPatient));
-    sendSuccessPushNotification(
-      `✓ Patient Information Updated`,
-      {
-        body: `${updatedPatient.name} details have been saved successfully`,
-        requireInteraction: false,
-      }
-    );
+    // Notification is handled in the EditPatientModal
   };
 
   return (
@@ -166,7 +155,7 @@ const PatientDetailsPage: React.FC = () => {
         <div className="bg-white rounded-lg shadow-md p-6">
           <h2 className="text-xl font-bold text-gray-900 mb-4">Actions</h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <Button variant="primary" size="sm" onClick={() => sendPushNotification(`📞 Calling ${patient.phone}`, { body: 'Call initiated...', requireInteraction: false })} icon={FiPhone} iconPosition="left">
+            <Button variant="primary" size="sm" onClick={() => sendPushNotification(`📞 Calling ${patient.name}`, { body: `Phone: ${patient.phone}`, requireInteraction: false, tag: 'patient-call' })} icon={FiPhone} iconPosition="left">
               Call
             </Button>
             <Button variant="secondary" size="sm" onClick={handleSendMessage} icon={FiMail} iconPosition="left">
