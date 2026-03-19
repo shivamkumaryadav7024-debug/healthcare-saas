@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#4F46E5" />
+    <meta name="description" content="HealthHub - B2B Healthcare SaaS Platform for Patient Management" />
+    <title>HealthHub - Healthcare SaaS</title>
+    <link rel="manifest" href="/manifest.json" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Service Worker registration fallback
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(err => console.log(err));
+        });
+      }
+    </script>
+  </body>
+</html>
