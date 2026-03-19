@@ -159,7 +159,9 @@ const EditPatientModal: React.FC<EditPatientModalProps> = ({
     }
   };
 
-  const isFormValid = Object.keys(errors).length === 0 && touched.name && touched.email && touched.phone && touched.dateOfBirth && touched.address;
+  // Check if form is valid by re-validating (button enabled when no errors)
+  const currentValidationErrors = validateForm(formData);
+  const isFormValid = Object.keys(currentValidationErrors).length === 0;
 
   if (!isOpen) return null;
 
@@ -356,6 +358,7 @@ const EditPatientModal: React.FC<EditPatientModalProps> = ({
               iconPosition="left"
               className={`flex-1 ${!isFormValid ? 'opacity-50 cursor-not-allowed' : ''}`}
               disabled={!isFormValid}
+              title={!isFormValid ? 'Please fix validation errors' : 'Save patient information'}
             >
               Save Changes
             </Button>
