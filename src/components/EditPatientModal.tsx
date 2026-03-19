@@ -134,13 +134,19 @@ const EditPatientModal: React.FC<EditPatientModalProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const newErrors = validateForm(formData);
     
     if (Object.keys(newErrors).length === 0) {
-      onSave(formData);
-      onClose();
+      try {
+        onSave(formData);
+        setErrors({});
+        setTouched({});
+        onClose();
+      } catch (error) {
+        console.error('Error saving patient:', error);
+      }
     } else {
       setErrors(newErrors);
       setTouched({

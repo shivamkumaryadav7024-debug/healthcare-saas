@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAppSelector } from '../hooks/useAppSelector';
 import { useAppDispatch } from '../hooks/useAppDispatch';
 import { initializeMockData, updatePatient } from '../store/patientSlice';
-import { showSuccessNotification } from '../utils/toast';
+import { showSuccessNotification, sendCombinedNotification } from '../utils/toast';
 import { FiArrowLeft, FiPhone, FiMail, FiMessageCircle, FiEdit2, FiCalendar, FiGift, FiUser as FiGender, FiFileText } from 'react-icons/fi';
 import Button from '../components/Button';
 import Card from '../components/Card';
@@ -42,17 +42,29 @@ const PatientDetailsPage: React.FC = () => {
   const handleRescheduleAppointment = (newDate: string) => {
     const updatedPatient = { ...patient, appointmentDate: newDate };
     dispatch(updatePatient(updatedPatient));
-    showSuccessNotification(`Appointment rescheduled for ${patient.name} on ${newDate}`);
+    sendCombinedNotification(
+      `Appointment rescheduled for ${patient.name} on ${newDate}`,
+      'success',
+      { showLocal: true, showPush: true }
+    );
   };
 
   const handleSendMessage = () => {
-    showSuccessNotification(`Message sent to ${patient.name}`);
+    sendCombinedNotification(
+      `Message sent to ${patient.name}`,
+      'info',
+      { showLocal: true, showPush: false }
+    );
   };
 
   const handleEditPatient = (updatedPatient: any) => {
     // Dispatch action to update patient in Redux store
     dispatch(updatePatient(updatedPatient));
-    showSuccessNotification(`Patient details updated for ${updatedPatient.name}`);
+    sendCombinedNotification(
+      `✓ Patient details updated for ${updatedPatient.name}`,
+      'success',
+      { showLocal: true, showPush: true }
+    );
   };
 
   return (
@@ -148,7 +160,7 @@ const PatientDetailsPage: React.FC = () => {
         <div className="bg-white rounded-lg shadow-md p-6">
           <h2 className="text-xl font-bold text-gray-900 mb-4">Actions</h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <Button variant="primary" size="sm" onClick={() => showSuccessNotification(`Call initiated to ${patient.phone}`)} icon={FiPhone} iconPosition="left">
+            <Button variant="primary" size="sm" onClick={() => sendCombinedNotification(`Calling ${patient.phone}...`, 'info', { showLocal: true, showPush: true })} icon={FiPhone} iconPosition="left">
               Call
             </Button>
             <Button variant="secondary" size="sm" onClick={handleSendMessage} icon={FiMail} iconPosition="left">
