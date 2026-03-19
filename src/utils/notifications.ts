@@ -3,44 +3,131 @@ export const registerServiceWorker = () => {
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker
-        .register('/service-worker.ts')
+        .register('/service-worker.js')
         .then((registration) => {
-          console.log('Service Worker registered:', registration);
+          console.log('✓ Service Worker registered successfully:', registration);
         })
         .catch((error) => {
-          console.log('Service Worker registration failed:', error);
+          console.error('✗ Service Worker registration failed:', error);
         });
     });
+  } else {
+    console.warn('Service Workers not supported in this browser');
   }
 };
 
 // Request notification permission
 export const requestNotificationPermission = async () => {
   if (!('Notification' in window)) {
-    console.log('This browser does not support notifications');
+    console.log('✗ This browser does not support notifications');
     return false;
   }
 
   if (Notification.permission === 'granted') {
+    console.log('✓ Notification permission already granted');
     return true;
   }
 
   if (Notification.permission !== 'denied') {
-    const permission = await Notification.requestPermission();
-    return permission === 'granted';
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission === 'granted') {
+        console.log('✓ Notification permission granted');
+      }
+      return permission === 'granted';
+    } catch (error) {
+      console.error('Error requesting notification permission:', error);
+      return false;
+    }
   }
 
+  console.log('✗ Notification permission denied');
   return false;
 };
 
-// Send local notification
+// Send local notification via Service Worker
 export const sendLocalNotification = (title: string, options?: NotificationOptions) => {
   if ('Notification' in window && Notification.permission === 'granted') {
-    new Notification(title, {
-      icon: '/logo.png',
+    return new Notification(title, {
+      icon: '/vite.svg',
+      badge: '/vite.svg',
       ...options,
     });
   }
+};
+
+// Check if push notifications are enabled
+export const isPushNotificationsEnabled = (): boolean => {
+  return 'Notification' in window && Notification.permission === 'granted';
+};
+
+// Send push notification via Notification API
+export const sendPushNotification = (
+  title: string,
+  options?: NotificationOptions
+): Notification | null => {
+  if (!('Notification' in window)) {
+    console.log('Push notifications not supported');
+    return null;
+  }
+
+  if (Notification.permission === 'granted') {
+    try {
+      return new Notification(title, {
+        icon: '/vite.svg',
+        badge: '/vite.svg',
+        tag: 'healthcare-notification',
+        requireInteraction: false,
+        ...options,
+      });
+    } catch (error) {
+      console.error('Error sending push notification:', error);
+      return null;
+    }
+  }
+
+  return null;
+};
+
+// Type-specific push notifications
+export const sendSuccessPushNotification = (
+  title: string,
+  options?: NotificationOptions
+): Notification | null => {
+  return sendPushNotification(title, {
+    ...options,
+    tag: 'success-notification',
+  });
+};
+
+export const sendErrorPushNotification = (
+  title: string,
+  options?: NotificationOptions
+): Notification | null => {
+  return sendPushNotification(title, {
+    ...options,
+    tag: 'error-notification',
+  });
+};
+
+export const sendWarningPushNotification = (
+  title: string,
+  options?: NotificationOptions
+): Notification | null => {
+  return sendPushNotification(title, {
+    ...options,
+    tag: 'warning-notification',
+  });
+};
+
+export const sendInfoPushNotification = (
+  title: string,
+  options?: NotificationOptions
+): Notification | null => {
+  return sendPushNotification(title, {
+    ...options,
+    tag: 'info-notification',
+  });
 };
 
 // Subscribe to push notifications
@@ -52,32 +139,17 @@ export const subscribeToPushNotifications = async () => {
 
   try {
     const registration = await navigator.serviceWorker.ready;
-    const subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(
-        'BGOA1-Q0o8e1zqmlw_F6Jx_dj0VV4lVf0WOz3x7E0Sk2EH9bzfcnv1Eh3vV6WzfL_7kXr0PlMnzrXqHSQ-8ZUHE'
-      ) as BufferSource,
-    });
-    return subscription;
+    const subscription = await registration.pushManager.getSubscription();
+
+    if (subscription) {
+      console.log('✓ Already subscribed to push notifications');
+      return subscription;
+    }
+
+    console.log('Push notifications available');
+    return null;
   } catch (error) {
     console.error('Failed to subscribe to push notifications:', error);
     return null;
   }
 };
-
-// URL safe base64 to Uint8Array conversion
-function urlBase64ToUint8Array(base64String: string): Uint8Array {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding)
-    .replace(/\-/g, '+')
-    .replace(/_/g, '/');
-
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-
-  return outputArray;
-}

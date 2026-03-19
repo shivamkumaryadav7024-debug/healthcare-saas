@@ -83,12 +83,17 @@ export const sendPushNotification = (
   title: string,
   options?: NotificationOptions
 ): Notification | null => {
+  console.log('🔔 Sending push notification:', { title, permission: Notification.permission });
+  
   if (!('Notification' in window)) {
-    console.log('Push notifications not supported');
+    console.warn(' Push notifications not supported in this browser');
     return null;
   }
 
-  if (Notification.permission === 'granted') {
+  const permission = Notification.permission;
+  console.log(' Current notification permission:', permission);
+
+  if (permission === 'granted') {
     try {
       const defaultOptions: NotificationOptions = {
         icon: '/vite.svg',
@@ -98,11 +103,25 @@ export const sendPushNotification = (
         ...options,
       };
 
-      return new Notification(title, defaultOptions);
+      console.log('Creating notification with:', { title, ...defaultOptions });
+      const notification = new Notification(title, defaultOptions);
+      
+      // Handle notification click
+      notification.onclick = () => {
+        console.log(' Notification clicked:', title);
+        window.focus();
+      };
+      
+      console.log(' Notification created and displayed:', title);
+      return notification;
     } catch (error) {
       console.error('Error sending push notification:', error);
       return null;
     }
+  } else if (permission === 'denied') {
+    console.warn('Notification permission denied by user');
+  } else {
+    console.warn('Notification permission not granted. Current status:', permission);
   }
 
   return null;

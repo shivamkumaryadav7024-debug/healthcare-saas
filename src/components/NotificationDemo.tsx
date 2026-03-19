@@ -1,230 +1,183 @@
-import React, { useState, useEffect } from 'react';
-import { FiBell, FiCheckCircle, FiAlertCircle, FiInfo, FiAlertTriangle } from 'react-icons/fi';
+// components/NotificationDemo.tsx
+import React, { useState } from 'react';
+import { FiBell, FiCheckCircle, FiAlertCircle, FiInfo, FiX } from 'react-icons/fi';
 import { useNotifications } from '../hooks/useNotifications';
-import Button from './Button';
 import {
-  requestNotificationPermission,
-  isPushNotificationsEnabled,
-  sendSuccessPushNotification,
-  sendErrorPushNotification,
-  sendWarningPushNotification,
-  sendInfoPushNotification,
-  sendPushNotification,
-} from '../utils/toast';
+  notifyPatientUpdate,
+  notifyAppointment,
+  notifyCriticalAlert,
+} from '../services/notificationService';
 
-interface NotificationDemoProps {
-  className?: string;
+interface NotificationLog {
+  id: string;
+  title: string;
+  body: string;
+  timestamp: Date;
+  type: 'success' | 'alert' | 'info';
 }
 
-const NotificationDemo: React.FC<NotificationDemoProps> = ({ className = '' }) => {
-  const { isSupported, isPermissionGranted, sendNotification } = useNotifications();
-  const [pushEnabled, setPushEnabled] = useState<boolean>(isPushNotificationsEnabled());
-  const [isLoading, setIsLoading] = useState(false);
-  const [statusMessage, setStatusMessage] = useState<string>('');
+const NotificationDemo: React.FC<{ className?: string }> = ({ className = '' }) => {
+  const { isSupported, isPermissionGranted, isRegistered, requestPermission } =
+    useNotifications();
 
-  useEffect(() => {
-    setPushEnabled(isPushNotificationsEnabled());
-  }, []);
+  const [logs, setLogs] = useState<NotificationLog[]>([]);
+  const [isRequesting, setIsRequesting] = useState(false);
 
-  const handleEnablePushNotifications = async () => {
-    setIsLoading(true);
-    setStatusMessage('Requesting permission...');
-    try {
-      const permission = await requestNotificationPermission();
-      setPushEnabled(permission);
-      if (permission) {
-        sendSuccessPushNotification('✓ Push Notifications Enabled', {
-          body: 'You will now receive browser notifications',
-          requireInteraction: true,
-        });
-        setStatusMessage('✓ Push notifications enabled!');
-        setTimeout(() => setStatusMessage(''), 3000);
-      } else {
-        setStatusMessage('✗ Permission denied');
-        setTimeout(() => setStatusMessage(''), 3000);
-      }
-    } catch (error) {
-      console.error('Error enabling notifications:', error);
-      setStatusMessage('✗ Failed to enable notifications');
-      setTimeout(() => setStatusMessage(''), 3000);
-    } finally {
-      setIsLoading(false);
+  const addLog = (title: string, body: string, type: NotificationLog['type'] = 'info') =>
+    setLogs((prev) => [{ id: Date.now().toString(), title, body, timestamp: new Date(), type }, ...prev].slice(0, 5));
+
+  const removeLog = (id: string) => setLogs((prev) => prev.filter((n) => n.id !== id));
+
+  const handleEnable = async () => {
+    if (isPermissionGranted) return;
+    setIsRequesting(true);
+    const granted = await requestPermission();
+    setIsRequesting(false);
+    if (granted) {
+      addLog('Notifications enabled', 'You will now receive desktop alerts.', 'success');
+    } else {
+      addLog('Permission denied', 'Enable notifications in your browser settings.', 'alert');
     }
   };
 
-  const handleInfoNotification = async () => {
-    await sendNotification('Patient Information', {
-      body: 'New patient record updated: John Doe (ID: 12345)',
-      tag: 'patient-info',
-      data: { url: '/patients', type: 'info' },
-    });
-    sendInfoPushNotification('📋 Patient Information Updated', {
-      body: 'John Doe (ID: 12345) - Record synced',
-      requireInteraction: false,
-    });
+  // ── Demo actions ─────────────────────────────────────────────────────────────
+
+  const handlePatientUpdate = async () => {
+    const ok = await notifyPatientUpdate('John Doe');
+    if (ok) addLog('Patient Record Updated', "John Doe's record has been synced.", 'info');
+    else addLog('Blocked', 'Enable notifications first.', 'alert');
   };
 
-  const handleAppointmentNotification = async () => {
-    await sendNotification('Appointment Reminder', {
-      body: 'Appointment scheduled for tomorrow at 2:00 PM',
-      tag: 'appointment-reminder',
-      data: { url: '/dashboard', type: 'appointment' },
-    });
-    sendSuccessPushNotification('✓ Appointment Scheduled', {
-      body: 'Tomorrow at 2:00 PM - Reminder set',
-      requireInteraction: false,
-    });
+  const handleAppointment = async () => {
+    const ok = await notifyAppointment('Dr. Priya Sharma', 'Tomorrow @ 2:00 PM');
+    if (ok) addLog('Appointment Reminder', 'Dr. Priya Sharma – Tomorrow @ 2:00 PM', 'success');
+    else addLog('Blocked', 'Enable notifications first.', 'alert');
   };
 
-  const handleAlertNotification = async () => {
-    await sendNotification('Alert: Action Required', {
-      body: 'Patient needs attention - high blood pressure reading detected',
-      tag: 'alert',
-      data: { url: '/patients', type: 'alert' },
-    });
-    sendErrorPushNotification('⚠ Alert: High Blood Pressure', {
-      body: 'Patient needs immediate attention - BP reading abnormal',
-      requireInteraction: true,
-    });
-  };
-
-  const handleSuccessNotification = async () => {
-    await sendNotification('Success!', {
-      body: 'Patient appointment has been confirmed',
-      tag: 'success',
-      data: { url: '/dashboard', type: 'success' },
-    });
-    sendSuccessPushNotification('✓ Appointment Confirmed', {
-      body: 'Patient has confirmed their appointment successfully',
-      requireInteraction: false,
-    });
+  const handleCritical = async () => {
+    const ok = await notifyCriticalAlert('BP 160/100 mmHg', 'Jane Smith');
+    if (ok) addLog('Critical Alert', 'Jane Smith: BP 160/100 mmHg – Immediate attention required.', 'alert');
+    else addLog('Blocked', 'Enable notifications first.', 'alert');
   };
 
   if (!isSupported) {
     return (
-      <div className={`bg-yellow-50 border border-yellow-200 rounded-lg p-4 ${className}`}>
-        <p className="text-yellow-800 text-sm">
-          Push notifications are not supported in your browser
-        </p>
+      <div className={`bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-yellow-800 ${className}`}>
+        Your browser does not support push notifications.
       </div>
     );
   }
 
+  const statusColor = isPermissionGranted ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+  const statusLabel = isPermissionGranted ? '✓ ON' : '✗ OFF';
+
   return (
     <div className={`bg-white rounded-lg shadow-md p-6 ${className}`}>
-      <div className="mb-6">
-        <div className="flex items-center gap-2 mb-4">
-          <FiBell size={24} className="text-indigo-600" />
-          <h3 className="text-lg font-bold text-gray-900">Browser Push Notifications</h3>
-        </div>
-        <p className="text-sm text-gray-600">Test browser notification API with real healthcare alerts</p>
+      {/* Header */}
+      <div className="flex items-center gap-2 mb-1">
+        <FiBell size={20} className="text-indigo-600" />
+        <h3 className="text-base font-bold text-gray-900">Push Notifications</h3>
       </div>
+      <p className="text-sm text-gray-500 mb-5">Service Worker · {isRegistered ? 'SW registered' : 'Registering…'}</p>
 
-      {/* Push Notifications Status */}
-      <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-        <div className="flex items-center justify-between mb-4">
+      {/* Status card */}
+      <div className="mb-5 p-4 bg-indigo-50 rounded-lg border border-indigo-100">
+        <div className="flex items-center justify-between mb-3">
           <div>
-            <h4 className="text-sm font-semibold text-gray-900">Browser Notifications</h4>
-            <p className="text-sm text-gray-600 mt-1">
-              {pushEnabled
-                ? '✓ Enabled - Push notifications will appear in your system tray'
-                : '✗ Disabled - Click enable to start receiving notifications'}
+            <p className="text-sm font-semibold text-gray-900">Permission status</p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {isPermissionGranted ? 'Click any demo button below' : 'Click Enable to request permission'}
             </p>
           </div>
-          <span
-            className={`px-3 py-1 rounded-full text-xs font-semibold ${
-              pushEnabled
-                ? 'bg-green-100 text-green-800'
-                : 'bg-gray-100 text-gray-800'
-            }`}
-          >
-            {pushEnabled ? 'ON' : 'OFF'}
+          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${statusColor}`}>
+            {statusLabel}
           </span>
         </div>
-        <Button
-          onClick={handleEnablePushNotifications}
-          variant={pushEnabled ? 'secondary' : 'primary'}
-          disabled={isLoading || pushEnabled}
-          size="sm"
-          className="w-full"
+
+        <button
+          onClick={handleEnable}
+          disabled={isPermissionGranted || isRequesting}
+          className={`w-full py-2 rounded-lg text-sm font-medium transition ${
+            isPermissionGranted
+              ? 'bg-green-100 text-green-700 cursor-default'
+              : 'bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60'
+          }`}
         >
-          {isLoading ? 'Requesting Permission...' : pushEnabled ? '✓ Enabled' : 'Enable Push Notifications'}
-        </Button>
-        {statusMessage && (
-          <p className={`text-sm mt-2 ${statusMessage.includes('✓') ? 'text-green-600' : 'text-red-600'}`}>
-            {statusMessage}
-          </p>
-        )}
+          {isRequesting ? 'Requesting…' : isPermissionGranted ? '✓ Notifications enabled' : '🔔 Enable Notifications'}
+        </button>
       </div>
 
-      {!isPermissionGranted && (
-        <p className="text-sm text-orange-600 mb-4">
-          ℹ Tip: Service Worker notifications need permission. Click "Enable Push Notifications" first.
-        </p>
-      )}
-
-      <div>
-        <h4 className="text-sm font-semibold text-gray-900 mb-3">Healthcare Alert Demos</h4>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <Button
-            onClick={handleInfoNotification}
-            variant="secondary"
-            size="sm"
-            icon={FiInfo}
-            iconPosition="left"
-            disabled={!pushEnabled}
-            className="text-xs"
-            title="Push notification demo"
+      {/* Demo buttons */}
+      <div className="mb-5">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Healthcare demos</p>
+        <div className="grid grid-cols-3 gap-2">
+          <button
+            onClick={handlePatientUpdate}
+            disabled={!isPermissionGranted}
+            className="flex flex-col items-center gap-1.5 p-3 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-40 transition text-xs font-medium"
           >
+            <FiInfo size={16} />
             Patient Info
-          </Button>
-          <Button
-            onClick={handleAppointmentNotification}
-            variant="primary"
-            size="sm"
-            icon={FiCheckCircle}
-            iconPosition="left"
-            disabled={!pushEnabled}
-            className="text-xs"
-            title="Push notification demo"
+          </button>
+          <button
+            onClick={handleAppointment}
+            disabled={!isPermissionGranted}
+            className="flex flex-col items-center gap-1.5 p-3 rounded-lg border border-green-200 bg-green-50 text-green-700 hover:bg-green-100 disabled:opacity-40 transition text-xs font-medium"
           >
+            <FiCheckCircle size={16} />
             Appointment
-          </Button>
-          <Button
-            onClick={handleAlertNotification}
-            variant="danger"
-            size="sm"
-            icon={FiAlertCircle}
-            iconPosition="left"
-            disabled={!pushEnabled}
-            className="text-xs"
-            title="Push notification demo"
+          </button>
+          <button
+            onClick={handleCritical}
+            disabled={!isPermissionGranted}
+            className="flex flex-col items-center gap-1.5 p-3 rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-40 transition text-xs font-medium"
           >
-            Alert
-          </Button>
-          <Button
-            onClick={handleSuccessNotification}
-            variant="primary"
-            size="sm"
-            icon={FiCheckCircle}
-            iconPosition="left"
-            disabled={!pushEnabled}
-            className="text-xs"
-            title="Push notification demo"
-          >
-            Success
-          </Button>
+            <FiAlertCircle size={16} />
+            Critical Alert
+          </button>
         </div>
       </div>
 
-      <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-        <p className="text-xs text-blue-900">
-          <strong>💡 How it works:</strong><br/>
-          1. Click "Enable Push Notifications" and accept browser permission<br/>
-          2. Click any alert button to test a healthcare notification<br/>
-          3. Notifications appear in your system notification center<br/>
-          4. Click the notification to interact with it
-        </p>
+      {/* Log */}
+      {logs.length > 0 && (
+        <div className="mb-5 p-3 bg-gray-50 rounded-lg border border-gray-200">
+          <p className="text-xs font-semibold text-gray-500 mb-2">Recent</p>
+          <div className="space-y-2">
+            {logs.map((n) => (
+              <div
+                key={n.id}
+                className={`p-2.5 rounded-lg flex items-start justify-between gap-2 ${
+                  n.type === 'success' ? 'bg-green-50 border border-green-200' :
+                  n.type === 'alert'   ? 'bg-red-50 border border-red-200' :
+                                         'bg-blue-50 border border-blue-200'
+                }`}
+              >
+                <div className="flex-1 min-w-0">
+                  <p className={`text-xs font-semibold truncate ${
+                    n.type === 'success' ? 'text-green-800' :
+                    n.type === 'alert'   ? 'text-red-800' : 'text-blue-800'
+                  }`}>{n.title}</p>
+                  <p className="text-xs text-gray-600 mt-0.5">{n.body}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{n.timestamp.toLocaleTimeString()}</p>
+                </div>
+                <button onClick={() => removeLog(n.id)} className="text-gray-400 hover:text-gray-600 shrink-0">
+                  <FiX size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Instructions */}
+      <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg">
+        <p className="text-xs font-semibold text-gray-700 mb-1.5">How it works</p>
+        <ol className="text-xs text-gray-600 space-y-1 list-decimal ml-4">
+          <li>Click <strong>Enable Notifications</strong> and accept the prompt</li>
+          <li>Click a demo button — notification fires via Service Worker</li>
+          <li>Switch to another tab to see the OS-level notification appear</li>
+          <li>Check your system notification center if it doesn't pop up</li>
+        </ol>
       </div>
     </div>
   );

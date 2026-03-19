@@ -1,121 +1,120 @@
-// Service Worker registration and notification utilities
+// services/notificationService.ts
 
-export const registerServiceWorker = async () => {
-  if (!('serviceWorker' in navigator)) {
-    console.log('Service Workers not supported');
-    return null;
-  }
+let _swRegistration: ServiceWorkerRegistration | null = null;
 
+// ─── Service Worker ───────────────────────────────────────────────────────────
+
+export const registerServiceWorker = async (): Promise<ServiceWorkerRegistration | null> => {
+  if (!('serviceWorker' in navigator)) return null;
   try {
-    const registration = await navigator.serviceWorker.register('/service-worker.js', {
-      scope: '/',
-    });
-
-    console.log('Service Worker registered successfully:', registration);
-
-    // Check for updates periodically
-    setInterval(() => {
-      registration.update();
-    }, 60000); // Check every minute
-
-    return registration;
-  } catch (error) {
-    console.error('Service Worker registration failed:', error);
+    const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+    _swRegistration = reg;
+    console.log('[SW] Registered, scope:', reg.scope);
+    return reg;
+  } catch (err) {
+    console.error('[SW] Registration failed:', err);
     return null;
   }
 };
 
-export const requestNotificationPermission = async () => {
-  if (!('Notification' in window)) {
-    console.log('Notifications not supported');
+export const getSwRegistration = () => _swRegistration;
+
+// ─── Permission ───────────────────────────────────────────────────────────────
+
+export const requestNotificationPermission = async (): Promise<boolean> => {
+  if (!('Notification' in window)) return false;
+  if (Notification.permission === 'granted') return true;
+  if (Notification.permission === 'denied') return false;
+
+  try {
+    const result = await Notification.requestPermission();
+    return result === 'granted';
+  } catch (err) {
+    console.error('[Notif] Permission request failed:', err);
+    return false;
+  }
+};
+
+export const isPermissionGranted = () =>
+  'Notification' in window && Notification.permission === 'granted';
+
+// ─── Send Notification ────────────────────────────────────────────────────────
+
+export interface NotificationPayload {
+  body?: string;
+  icon?: string;
+  badge?: string;
+  tag?: string;
+  requireInteraction?: boolean;
+  url?: string;
+  data?: Record<string, unknown>;
+}
+
+export const sendLocalNotification = async (
+  title: string,
+  options: NotificationPayload = {}
+): Promise<boolean> => {
+  if (!isPermissionGranted()) {
+    console.warn('[Notif] Permission not granted');
     return false;
   }
 
-  if (Notification.permission === 'granted') {
-    return true;
-  }
-
-  if (Notification.permission !== 'denied') {
-    try {
-      const permission = await Notification.requestPermission();
-      return permission === 'granted';
-    } catch (error) {
-      console.error('Notification permission request failed:', error);
-      return false;
-    }
-  }
-
-  return false;
-};
-
-export const subscribeToPushNotifications = async (registration: ServiceWorkerRegistration) => {
-  if (!('pushManager' in registration)) {
-    console.log('Push notifications not supported');
-    return null;
-  }
+  const payload: NotificationOptions = {
+    icon: '/vite.svg',
+    badge: '/vite.svg',
+    tag: 'healthhub',
+    requireInteraction: false,
+    ...options,
+    data: { url: options.url ?? '/', ...options.data },
+  };
 
   try {
-    // Get existing subscription
-    const subscription = await registration.pushManager.getSubscription();
-
-    if (subscription) {
-      console.log('Already subscribed to push notifications');
-      return subscription;
-    }
-
-    // Create new subscription (Note: Requires VAPID public key from backend)
-    // For now, we'll just log that subscription would happen
-    console.log('Push notifications available. Configure with VAPID key for production.');
-    return null;
-  } catch (error) {
-    console.error('Push subscription failed:', error);
-    return null;
-  }
-};
-
-export const sendLocalNotification = async (title: string, options?: NotificationOptions) => {
-  if (!('Notification' in window)) {
-    console.log('Notifications not supported');
-    return;
-  }
-
-  if (Notification.permission !== 'granted') {
-    console.log('Notification permission not granted');
-    return;
-  }
-
-  try {
-    const registration = await navigator.serviceWorker.ready;
-
-    const notificationOptions = {
-      icon: '🏥',
-      badge: '/logo.png',
-      tag: 'healthhub-notification',
-      requireInteraction: false,
-      ...options,
-    };
-
-    if (registration && registration.showNotification) {
-      await registration.showNotification(title, notificationOptions);
+    // Prefer service worker showNotification (works when tab is in background)
+    const sw = _swRegistration ?? (await navigator.serviceWorker.ready.catch(() => null));
+    if (sw?.showNotification) {
+      await sw.showNotification(title, payload);
     } else {
-      new Notification(title, notificationOptions);
+      // Fallback: direct Notification constructor (foreground only)
+      new Notification(title, payload);
     }
-  } catch (error) {
-    console.error('Failed to send notification:', error);
+    return true;
+  } catch (err) {
+    console.error('[Notif] Failed to show notification:', err);
+    return false;
   }
 };
 
-export const sendMessageToServiceWorker = (message: any) => {
-  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-    navigator.serviceWorker.controller.postMessage(message);
-  }
-};
+// ─── Preset use-cases ─────────────────────────────────────────────────────────
 
-// Listen for messages from Service Worker
-export const startListeningToServiceWorker = () => {
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.addEventListener('message', (event) => {
-      console.log('Message from Service Worker:', event.data);
-    });
-  }
+export const notifyPatientUpdate = (patientName: string) =>
+  sendLocalNotification('Patient Record Updated', {
+    body: `${patientName}'s record has been synced.`,
+    tag: 'patient-update',
+  });
+
+export const notifyAppointment = (doctorName: string, time: string) =>
+  sendLocalNotification('Appointment Reminder', {
+    body: `${doctorName} – ${time}`,
+    tag: 'appointment',
+    requireInteraction: true,
+  });
+
+export const notifyCriticalAlert = (reading: string, patient: string) =>
+  sendLocalNotification('Critical Alert', {
+    body: `${patient}: ${reading} – Immediate attention required.`,
+    tag: 'critical-alert',
+    requireInteraction: true,
+  });
+
+// ─── Listen for SW → App messages ────────────────────────────────────────────
+
+export const listenForSwMessages = (
+  handler: (data: Record<string, unknown>) => void
+) => {
+  if (!('serviceWorker' in navigator)) return () => {};
+  const listener = (event: MessageEvent) => {
+    if (event.data?.type === 'NOTIFICATION_CLICK') handler(event.data);
+  };
+  navigator.serviceWorker.addEventListener('message', listener);
+  return () => navigator.serviceWorker.removeEventListener('message', listener);
 };

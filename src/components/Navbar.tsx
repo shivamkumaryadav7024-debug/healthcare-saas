@@ -1,3 +1,4 @@
+// components/Navbar.tsx
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAppSelector } from '../hooks/useAppSelector';
@@ -5,54 +6,45 @@ import { useAppDispatch } from '../hooks/useAppDispatch';
 import { logout } from '../store/authSlice';
 import { auth } from '../services/firebase';
 import { signOut } from 'firebase/auth';
-import {
-  FiLogOut,
-  FiBell,
-  FiHome,
-  FiUsers,
-  FiBarChart2,
-} from 'react-icons/fi';
-import { showSuccessNotification, requestNotificationPermission, sendInfoPushNotification, isPushNotificationsEnabled } from '../utils/toast';
+import { FiLogOut, FiBell, FiHome, FiUsers, FiBarChart2 } from 'react-icons/fi';
+import { showSuccessNotification } from '../utils/toast';
+import { useNotifications } from '../hooks/useNotifications';
+import { sendLocalNotification } from '../services/notificationService';
 
 const Navbar: React.FC = () => {
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
+  const { isPermissionGranted, requestPermission } = useNotifications();
 
   const handleLogout = async () => {
     try {
       await signOut(auth);
       dispatch(logout());
       const userName = user?.displayName || user?.email || 'User';
-      const userInitial = userName.charAt(0).toUpperCase();
-      showSuccessNotification(`${userInitial}. ${userName} logged out successfully`);
+      showSuccessNotification(`${userName} logged out successfully`);
     } catch (error) {
       console.error('Logout error:', error);
     }
   };
 
   const handleNotificationClick = async () => {
-    // Check if notifications are enabled
-    const isEnabled = isPushNotificationsEnabled();
-    
-    if (!isEnabled) {
-      // Request permission if not enabled
-      const permission = await requestNotificationPermission();
-      if (permission) {
-        sendInfoPushNotification('✓ Notifications Enabled', {
-          body: 'You will now receive desktop notifications',
-          requireInteraction: false,
+    if (!isPermissionGranted) {
+      const granted = await requestPermission();
+      if (granted) {
+        await sendLocalNotification('Notifications Enabled', {
+          body: 'You will now receive HealthHub desktop notifications.',
+          tag: 'permission-granted',
         });
         showSuccessNotification('Push notifications enabled!');
       } else {
-        showSuccessNotification('Permission denied. Please enable notifications in browser settings.');
+        showSuccessNotification('Permission denied – enable in browser settings.');
       }
     } else {
-      // Show notification status
-      sendInfoPushNotification('📬 Notification Center', {
-        body: 'No new notifications. Patient updates and alerts will appear here.',
-        requireInteraction: false,
+      await sendLocalNotification('Notification Center', {
+        body: 'No new notifications. Patient updates will appear here.',
         tag: 'notification-center',
       });
+      showSuccessNotification('No new notifications');
     }
   };
 
@@ -61,53 +53,39 @@ const Navbar: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
-          <div className="flex items-center">
-            <Link to="/" className="flex items-center space-x-2">
-              <span className="text-2xl">🏥</span>
-              <span className="text-xl font-bold text-indigo-600 hidden sm:inline">
-                HealthHub
-              </span>
-            </Link>
-          </div>
+          <Link to="/" className="flex items-center space-x-2">
+            <span className="text-2xl">🏥</span>
+            <span className="text-xl font-bold text-indigo-600 hidden sm:inline">HealthHub</span>
+          </Link>
 
-          {/* Links */}
           {user && (
             <div className="flex items-center space-x-4 sm:space-x-6">
-              <Link
-                to="/dashboard"
-                className="flex items-center gap-2 text-gray-700 hover:text-indigo-600 transition"
-              >
+              <Link to="/dashboard" className="flex items-center gap-2 text-gray-700 hover:text-indigo-600 transition">
                 <FiHome size={20} />
                 <span className="hidden sm:inline">Dashboard</span>
               </Link>
-              <Link
-                to="/patients"
-                className="flex items-center gap-2 text-gray-700 hover:text-indigo-600 transition"
-              >
+              <Link to="/patients" className="flex items-center gap-2 text-gray-700 hover:text-indigo-600 transition">
                 <FiUsers size={20} />
                 <span className="hidden sm:inline">Patients</span>
               </Link>
-              <Link
-                to="/analytics"
-                className="flex items-center gap-2 text-gray-700 hover:text-indigo-600 transition"
-              >
+              <Link to="/analytics" className="flex items-center gap-2 text-gray-700 hover:text-indigo-600 transition">
                 <FiBarChart2 size={20} />
                 <span className="hidden sm:inline">Analytics</span>
               </Link>
 
-              {/* Notifications */}
-              <button 
+              {/* Bell — red dot when permission not yet granted */}
+              <button
                 onClick={handleNotificationClick}
                 className="p-2 text-gray-700 hover:text-indigo-600 transition hover:bg-indigo-50 rounded-lg relative"
-                title="Enable/View Notifications"
+                title={isPermissionGranted ? 'View notifications' : 'Enable notifications'}
               >
                 <FiBell size={20} />
-                {!isPushNotificationsEnabled() && (
-                  <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                {!isPermissionGranted && (
+                  <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
                 )}
               </button>
 
-              {/* User Menu */}
+              {/* User + Logout */}
               <div className="flex items-center space-x-2 border-l pl-4">
                 <span className="text-sm text-gray-700 hidden sm:inline">
                   {user.displayName || user.email}

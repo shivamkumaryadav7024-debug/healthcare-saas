@@ -1,52 +1,67 @@
-import { useEffect, useState } from 'react';
+// hooks/useNotifications.ts
+import { useEffect, useRef, useState, useCallback } from 'react';
 import {
   registerServiceWorker,
   requestNotificationPermission,
   sendLocalNotification,
+  isPermissionGranted,
+  listenForSwMessages,
+  type NotificationPayload,
 } from '../services/notificationService';
 
-export const useNotifications = () => {
-  const [isSupported, setIsSupported] = useState(false);
-  const [isPermissionGranted, setIsPermissionGranted] = useState(false);
-  const [swRegistration, setSwRegistration] = useState<ServiceWorkerRegistration | null>(null);
+export interface UseNotificationsReturn {
+  isSupported: boolean;
+  isPermissionGranted: boolean;
+  isRegistered: boolean;
+  requestPermission: () => Promise<boolean>;
+  sendNotification: (title: string, options?: NotificationPayload) => Promise<boolean>;
+}
+
+export const useNotifications = (): UseNotificationsReturn => {
+  const [permissionGranted, setPermissionGranted] = useState(isPermissionGranted);
+  const [isRegistered, setIsRegistered] = useState(false);
+  const cleanupRef = useRef<(() => void) | null>(null);
+
+  const isSupported =
+    typeof window !== 'undefined' &&
+    'serviceWorker' in navigator &&
+    'Notification' in window;
 
   useEffect(() => {
-    // Check if notifications are supported
-    const supported =
-      'serviceWorker' in navigator &&
-      'Notification' in window &&
-      'PushManager' in window;
-    setIsSupported(supported);
+    if (!isSupported) return;
 
-    if (supported) {
-      // Register Service Worker
-      registerServiceWorker().then((registration) => {
-        setSwRegistration(registration);
+    // Register SW once on mount
+    registerServiceWorker().then((reg) => {
+      setIsRegistered(!!reg);
+    });
 
-        // Request notification permission
-        requestNotificationPermission().then((granted) => {
-          setIsPermissionGranted(granted);
-        });
-      });
-    }
+    // Sync permission state (user may have changed it in browser settings)
+    setPermissionGranted(isPermissionGranted());
+
+    // Listen for notification click events coming from SW
+    cleanupRef.current = listenForSwMessages((data) => {
+      console.log('[useNotifications] SW message received:', data);
+    });
+
+    return () => cleanupRef.current?.();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const requestPermission = useCallback(async (): Promise<boolean> => {
+    const granted = await requestNotificationPermission();
+    setPermissionGranted(granted);
+    return granted;
   }, []);
 
-  const sendNotification = async (
-    title: string,
-    options?: NotificationOptions
-  ) => {
-    if (!isSupported || !isPermissionGranted) {
-      console.warn('Notifications not supported or permission not granted');
-      return;
-    }
+  const sendNotification = useCallback(
+    async (title: string, options?: NotificationPayload): Promise<boolean> => {
+      if (!permissionGranted) {
+        console.warn('[useNotifications] Cannot send – permission not granted');
+        return false;
+      }
+      return sendLocalNotification(title, options);
+    },
+    [permissionGranted]
+  );
 
-    await sendLocalNotification(title, options);
-  };
-
-  return {
-    isSupported,
-    isPermissionGranted,
-    swRegistration,
-    sendNotification,
-  };
+  return { isSupported, isPermissionGranted: permissionGranted, isRegistered, requestPermission, sendNotification };
 };
