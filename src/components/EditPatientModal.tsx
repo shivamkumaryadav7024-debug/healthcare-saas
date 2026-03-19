@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { FiX, FiSave } from 'react-icons/fi';
+import React, { useState, useEffect } from 'react';
+import { FiX, FiSave, FiAlertCircle } from 'react-icons/fi';
 import Button from './Button';
 
 export interface Patient {
@@ -23,6 +23,14 @@ interface EditPatientModalProps {
   onSave: (updatedPatient: Patient) => void;
 }
 
+interface FormErrors {
+  name?: string;
+  email?: string;
+  phone?: string;
+  dateOfBirth?: string;
+  address?: string;
+}
+
 const EditPatientModal: React.FC<EditPatientModalProps> = ({
   patient,
   isOpen,
@@ -30,6 +38,68 @@ const EditPatientModal: React.FC<EditPatientModalProps> = ({
   onSave,
 }) => {
   const [formData, setFormData] = useState<Patient>(patient);
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  // Reset form when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setFormData(patient);
+      setErrors({});
+      setTouched({});
+    }
+  }, [isOpen, patient]);
+
+  // Validation functions
+  const validateForm = (data: Patient): FormErrors => {
+    const newErrors: FormErrors = {};
+
+    // Name validation
+    if (!data.name || data.name.trim().length === 0) {
+      newErrors.name = 'Patient name is required';
+    } else if (data.name.trim().length < 2) {
+      newErrors.name = 'Name must be at least 2 characters';
+    } else if (data.name.length > 100) {
+      newErrors.name = 'Name must not exceed 100 characters';
+    }
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!data.email || data.email.trim().length === 0) {
+      newErrors.email = 'Email is required';
+    } else if (!emailRegex.test(data.email)) {
+      newErrors.email = 'Please enter a valid email address';
+    }
+
+    // Phone validation
+    const phoneRegex = /^[\d\s\-\+\(\)]{10,}$/;
+    if (!data.phone || data.phone.trim().length === 0) {
+      newErrors.phone = 'Phone number is required';
+    } else if (!phoneRegex.test(data.phone.replace(/\s/g, ''))) {
+      newErrors.phone = 'Phone number must be at least 10 digits';
+    }
+
+    // Date of Birth validation
+    if (!data.dateOfBirth) {
+      newErrors.dateOfBirth = 'Date of birth is required';
+    } else {
+      const birthDate = new Date(data.dateOfBirth);
+      const today = new Date();
+      const age = today.getFullYear() - birthDate.getFullYear();
+      if (age < 18) {
+        newErrors.dateOfBirth = 'Patient must be at least 18 years old';
+      }
+    }
+
+    // Address validation
+    if (!data.address || data.address.trim().length === 0) {
+      newErrors.address = 'Address is required';
+    } else if (data.address.trim().length < 5) {
+      newErrors.address = 'Address must be at least 5 characters';
+    }
+
+    return newErrors;
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -37,13 +107,53 @@ const EditPatientModal: React.FC<EditPatientModalProps> = ({
       ...prev,
       [name]: value,
     }));
+    // Clear error for this field when user starts typing
+    if (touched[name]) {
+      const newErrors = { ...errors };
+      delete newErrors[name as keyof FormErrors];
+      setErrors(newErrors);
+    }
+  };
+
+  const handleBlur = (fieldName: string) => {
+    setTouched((prev) => ({
+      ...prev,
+      [fieldName]: true,
+    }));
+    // Validate this field
+    const fieldErrors = validateForm(formData);
+    if (fieldErrors[fieldName as keyof FormErrors]) {
+      setErrors((prev) => ({
+        ...prev,
+        [fieldName]: fieldErrors[fieldName as keyof FormErrors],
+      }));
+    } else {
+      const newErrors = { ...errors };
+      delete newErrors[fieldName as keyof FormErrors];
+      setErrors(newErrors);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(formData);
-    onClose();
+    const newErrors = validateForm(formData);
+    
+    if (Object.keys(newErrors).length === 0) {
+      onSave(formData);
+      onClose();
+    } else {
+      setErrors(newErrors);
+      setTouched({
+        name: true,
+        email: true,
+        phone: true,
+        dateOfBirth: true,
+        address: true,
+      });
+    }
   };
+
+  const isFormValid = Object.keys(errors).length === 0 && touched.name && touched.email && touched.phone && touched.dateOfBirth && touched.address;
 
   if (!isOpen) return null;
 
@@ -67,59 +177,101 @@ const EditPatientModal: React.FC<EditPatientModalProps> = ({
             {/* Name */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Full Name
+                Full Name <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 name="name"
                 value={formData.name}
                 onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                required
+                onBlur={() => handleBlur('name')}
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition ${
+                  errors.name && touched.name
+                    ? 'border-red-500 focus:ring-red-500'
+                    : 'border-gray-300 focus:ring-indigo-500'
+                }`}
               />
+              {errors.name && touched.name && (
+                <div className="flex items-center gap-2 text-red-600 text-sm mt-1">
+                  <FiAlertCircle size={16} />
+                  <span>{errors.name}</span>
+                </div>
+              )}
             </div>
 
             {/* Email */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Email
+                Email <span className="text-red-500">*</span>
               </label>
               <input
                 type="email"
                 name="email"
                 value={formData.email}
                 onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                required
+                onBlur={() => handleBlur('email')}
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition ${
+                  errors.email && touched.email
+                    ? 'border-red-500 focus:ring-red-500'
+                    : 'border-gray-300 focus:ring-indigo-500'
+                }`}
               />
+              {errors.email && touched.email && (
+                <div className="flex items-center gap-2 text-red-600 text-sm mt-1">
+                  <FiAlertCircle size={16} />
+                  <span>{errors.email}</span>
+                </div>
+              )}
             </div>
 
             {/* Phone */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Phone
+                Phone <span className="text-red-500">*</span>
               </label>
               <input
                 type="tel"
                 name="phone"
                 value={formData.phone}
                 onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                onBlur={() => handleBlur('phone')}
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition ${
+                  errors.phone && touched.phone
+                    ? 'border-red-500 focus:ring-red-500'
+                    : 'border-gray-300 focus:ring-indigo-500'
+                }`}
               />
+              {errors.phone && touched.phone && (
+                <div className="flex items-center gap-2 text-red-600 text-sm mt-1">
+                  <FiAlertCircle size={16} />
+                  <span>{errors.phone}</span>
+                </div>
+              )}
             </div>
 
             {/* Date of Birth */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Date of Birth
+                Date of Birth <span className="text-red-500">*</span>
               </label>
               <input
                 type="date"
                 name="dateOfBirth"
                 value={formData.dateOfBirth}
                 onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                onBlur={() => handleBlur('dateOfBirth')}
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition ${
+                  errors.dateOfBirth && touched.dateOfBirth
+                    ? 'border-red-500 focus:ring-red-500'
+                    : 'border-gray-300 focus:ring-indigo-500'
+                }`}
               />
+              {errors.dateOfBirth && touched.dateOfBirth && (
+                <div className="flex items-center gap-2 text-red-600 text-sm mt-1">
+                  <FiAlertCircle size={16} />
+                  <span>{errors.dateOfBirth}</span>
+                </div>
+              )}
             </div>
 
             {/* Gender */}
@@ -131,7 +283,7 @@ const EditPatientModal: React.FC<EditPatientModalProps> = ({
                 name="gender"
                 value={formData.gender}
                 onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
               >
                 <option value="Male">Male</option>
                 <option value="Female">Female</option>
@@ -148,7 +300,7 @@ const EditPatientModal: React.FC<EditPatientModalProps> = ({
                 name="status"
                 value={formData.status}
                 onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
               >
                 <option value="Active">Active</option>
                 <option value="Inactive">Inactive</option>
@@ -159,15 +311,26 @@ const EditPatientModal: React.FC<EditPatientModalProps> = ({
           {/* Address */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Address
+              Address <span className="text-red-500">*</span>
             </label>
             <textarea
               name="address"
               value={formData.address}
               onChange={handleInputChange}
+              onBlur={() => handleBlur('address')}
               rows={3}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition ${
+                errors.address && touched.address
+                  ? 'border-red-500 focus:ring-red-500'
+                  : 'border-gray-300 focus:ring-indigo-500'
+              }`}
             />
+            {errors.address && touched.address && (
+              <div className="flex items-center gap-2 text-red-600 text-sm mt-1">
+                <FiAlertCircle size={16} />
+                <span>{errors.address}</span>
+              </div>
+            )}
           </div>
 
           {/* Buttons */}
@@ -185,7 +348,8 @@ const EditPatientModal: React.FC<EditPatientModalProps> = ({
               variant="primary"
               icon={FiSave}
               iconPosition="left"
-              className="flex-1"
+              className={`flex-1 ${!isFormValid ? 'opacity-50 cursor-not-allowed' : ''}`}
+              disabled={!isFormValid}
             >
               Save Changes
             </Button>

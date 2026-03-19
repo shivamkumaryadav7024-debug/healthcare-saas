@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -10,11 +10,14 @@ import { useNotifications } from './hooks/useNotifications';
 import Navbar from './components/Navbar';
 import ToastProvider from './components/ToastProvider';
 import ProtectedRoute from './components/ProtectedRoute';
-import LoginPage from './pages/LoginPage';
-import DashboardPage from './pages/DashboardPage';
-import PatientsPage from './pages/PatientsPage';
-import PatientDetailsPage from './pages/PatientDetailsPage';
-import AnalyticsPage from './pages/AnalyticsPage';
+import Loading from './components/Loading';
+
+// Lazy load pages for code splitting
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const PatientsPage = lazy(() => import('./pages/PatientsPage'));
+const PatientDetailsPage = lazy(() => import('./pages/PatientDetailsPage'));
+const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
 
 const AppContent: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -48,36 +51,37 @@ const AppContent: React.FC = () => {
     <Router>
       <Navbar />
       <ToastProvider />
-      <Routes>
-        {/* Public Routes */}
-        <Route path="/login" element={<LoginPage />} />
+      <Suspense fallback={<Loading />}>
+        <Routes>
+          {/* Public Routes */}
+          <Route path="/login" element={<LoginPage />} />
 
-        {/* Protected Routes */}
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <DashboardPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/patients"
-          element={
-            <ProtectedRoute>
-              <PatientsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/patients/:patientId"
-          element={
-            <ProtectedRoute>
-              <PatientDetailsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
+          {/* Protected Routes */}
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/patients"
+            element={
+              <ProtectedRoute>
+                <PatientsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/patients/:patientId"
+            element={
+              <ProtectedRoute>
+                <PatientDetailsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
           path="/analytics"
           element={
             <ProtectedRoute>
@@ -90,6 +94,7 @@ const AppContent: React.FC = () => {
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
+      </Suspense>
     </Router>
   );
 };

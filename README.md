@@ -2,7 +2,7 @@
 
 A comprehensive React + TypeScript frontend application for managing healthcare services with patient management, analytics, and notifications.
 
-## 🌟 Features
+##  Features
 
 ### Core Features
 -  **Authentication**: Firebase-based login/signup with persistent sessions
@@ -64,7 +64,7 @@ npm run build
 npm run preview
 ```
 
-## 📁 Project Structure
+##  Project Structure
 
 ```
 src/
@@ -85,7 +85,7 @@ src/
 - **React Router** - Navigation
 - **Firebase** - Authentication
 
-## 📝 Features (To Build)
+##  Features (To Build)
 
 - Login functionality
 - Dashboard
@@ -94,11 +94,11 @@ src/
 - Notifications
 - Responsive UI
 
-## 🚀 Development
+##  Development
 
 The development server runs on `http://localhost:5173`. Hot module replacement (HMR) is enabled automatically.
 
-## 📦 Build
+##  Build
 
 ```bash
 npm run build
@@ -106,6 +106,3 @@ npm run build
 
 Output is in the `dist/` folder.
 
-## 📄 License
-
-MIT
